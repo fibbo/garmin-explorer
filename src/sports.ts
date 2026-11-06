@@ -90,7 +90,8 @@ export const sportOf = (garminType: string): SportKey =>
 export const sportColor = (sport: SportKey) =>
   `var(${SPORT_BY_KEY[sport].colorVar})`;
 
-const ICON_PATHS: Record<SportKey, string> = {
+/** Inner SVG markup of each sport icon, on a 24x24 grid */
+export const ICON_PATHS: Record<SportKey, string> = {
   run: '<path d="M13 4.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"/><path d="M7 21l3-5 3 2v4M6 12l3-4 4 1 3 4h3M10 16l1.5-6"/>',
   bike: '<circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/><path d="M5.5 17l4-7h6l3 7M9.5 10 12 17h0M14 6h2.5l-1 4"/>',
   swim: '<path d="M2 18c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M7 14l4-4-2-2 4-2 4 6"/><circle cx="18" cy="6" r="1.6"/>',
@@ -98,10 +99,6 @@ const ICON_PATHS: Record<SportKey, string> = {
   strength: '<path d="M6 7v10M18 7v10M3 9.5v5M21 9.5v5M6 12h12"/>',
   other: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
 };
-
-/** The sport icon on a colored square */
-export const sportBadge = (a: Activity) =>
-  `<span class="badge" style="background:${sportColor(a.sport)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[a.sport]}</svg></span>`;
 
 /** "trail_running" -> "Trail running" */
 export const activityTypeLabel = (type: string | null | undefined) =>

@@ -1,44 +1,43 @@
-// The Sync button: has the server sync with Garmin Connect, and shows its progress.
+// Has the server sync with Garmin Connect, and keeps the progress for the sync panel.
 import type { SyncEvent } from "./data-format";
-import { find } from "./dom";
-import { escapeHtml } from "./format";
 
 const HIDE_AFTER_MS = 5000;
 
-let running = false;
-let hideTimer: number | undefined;
+export type PanelKind = "busy" | "done" | "error";
 
-type Kind = "busy" | "done" | "error";
-const TITLES: Record<Kind, string> = {
-  busy: "Syncing with Garmin Connect",
-  done: "Sync finished",
-  error: "Sync failed",
-};
+export const sync = $state({
+  /** The page is served by server/serve.ts, which can sync */
+  available: false,
+  running: false,
+  /** The panel can be closed while the sync goes on */
+  panelOpen: false,
+  panel: null as {
+    kind: PanelKind;
+    text: string;
+    /** 0 to 1, null when unknown */
+    progress: number | null;
+  } | null,
+});
 
-/** Escapes the text and turns web addresses into links, which may wrap after a "/" */
-const withLinks = (text: string) =>
-  escapeHtml(text).replace(
-    /https:\/\/([^\s<]+)/g,
-    (url, rest: string) =>
-      `<a href="${url}" target="_blank" rel="noopener">${rest.replaceAll("/", "/<wbr>")}</a>`,
-  );
+let hideTimer: ReturnType<typeof setTimeout> | undefined;
+/** Closed during the sync: progress doesn't open it again, the end does */
+let closedWhileBusy = false;
 
-function showPanel(kind: Kind, text: string, progress: number | null = null) {
+function showPanel(
+  kind: PanelKind,
+  text: string,
+  progress: number | null = null,
+) {
   clearTimeout(hideTimer);
-  const panel = find("#sync-panel");
-  panel.hidden = false;
-  panel.dataset.kind = kind;
-  find("#sync-title").textContent = TITLES[kind];
-  find("#sync-text").innerHTML = withLinks(text);
-  const bar = find("#sync-bar");
-  bar.hidden = progress == null;
-  bar.style.setProperty("--progress", String(progress ?? 0));
+  sync.panel = { kind, text, progress };
+  if (kind !== "busy" || !closedWhileBusy) sync.panelOpen = true;
   if (kind === "done") hideTimer = setTimeout(hidePanel, HIDE_AFTER_MS);
 }
 
-function hidePanel() {
+export function hidePanel() {
   clearTimeout(hideTimer);
-  find("#sync-panel").hidden = true;
+  sync.panelOpen = false;
+  closedWhileBusy = sync.running;
 }
 
 function showEvent(event: SyncEvent) {
@@ -70,14 +69,14 @@ async function* readEvents(body: ReadableStream<Uint8Array>) {
   }
 }
 
-async function sync(onChange: () => void) {
-  if (running) {
-    find("#sync-panel").hidden = false;
+/** Starts a sync, or follows the one that is running. `onChange` runs after it changed data/. */
+export async function startSync(onChange: () => void) {
+  closedWhileBusy = false;
+  if (sync.running) {
+    sync.panelOpen = true;
     return;
   }
-  running = true;
-  const button = find("#sync");
-  button.setAttribute("aria-busy", "true");
+  sync.running = true;
   showPanel("busy", "Starting");
   let last: SyncEvent | null = null;
   try {
@@ -98,16 +97,12 @@ async function sync(onChange: () => void) {
       "Lost the connection to the Garmin Explorer server. Is it still running?",
     );
   } finally {
-    running = false;
-    button.removeAttribute("aria-busy");
+    sync.running = false;
   }
   if (last?.type === "done" && last.changed) onChange();
 }
 
-/**
- * Shows the Sync button when the page is served by server/serve.ts, and picks
- * up a sync that is already running. `onChange` runs after a sync changed data/.
- */
+/** Shows the Sync button when the server can sync, and follows a sync that is already running. */
 export async function initSync(onChange: () => void) {
   let status: { running: boolean };
   try {
@@ -117,9 +112,6 @@ export async function initSync(onChange: () => void) {
   } catch {
     return;
   }
-  const button = find("#sync");
-  button.hidden = false;
-  button.onclick = () => void sync(onChange);
-  find("#sync-close").onclick = hidePanel;
-  if (status.running) void sync(onChange);
+  sync.available = true;
+  if (status.running) void startSync(onChange);
 }

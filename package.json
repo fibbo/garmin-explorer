@@ -6,10 +6,10 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "npm run check && npm run bundle",
-    "bundle": "esbuild src/main.ts --bundle --format=iife --target=es2022 --minify --sourcemap --outfile=dist/app.js",
-    "watch": "npm run bundle -- --watch",
-    "check": "tsc && tsc -p server",
+    "build": "npm run check && vite build",
+    "watch": "vite build --watch",
+    "check": "svelte-check --fail-on-warnings && tsc -p server",
+    "format": "prettier --write .",
     "serve": "node server/serve.ts",
     "sync": "node server/sync.ts",
     "import": "node server/import.ts"
@@ -19,10 +19,16 @@
     "fflate": "^0.8.3"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/leaflet": "~1.9.0",
     "@types/node": "~24.19.2",
-    "esbuild": "^0.28.2",
-    "typescript": "^7.0.2",
-    "uplot": "^1.6.32"
+    "leaflet": "^1.9.4",
+    "prettier": "^3.9.10",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8",
+    "typescript": "~6.0.3",
+    "uplot": "^1.6.32",
+    "vite": "^8.3.6"
   }
 }

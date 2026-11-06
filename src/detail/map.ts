@@ -1,4 +1,5 @@
-// The Leaflet map of a recording's GPS track. Leaflet is loaded from lib/leaflet.js as the global `L`.
+// The Leaflet map of a recording's GPS track.
+import L from "leaflet";
 import { cssVar } from "../dom";
 
 export interface TrackMap {
@@ -13,21 +14,19 @@ export interface TrackMap {
   applyTheme(): void;
 }
 
-export const leafletLoaded = () => typeof L !== "undefined";
-
 /** Mouse within this many px of the track counts as hovering it */
 const HOVER_DISTANCE = 26;
 
 /**
- * Draws the track into the element with id `elementId`.
+ * Draws the track into `element`.
  * `onHover` gets the index into `points` of the track point under the mouse, or null.
  */
 export function createTrackMap(
-  elementId: string,
+  element: HTMLElement,
   points: L.LatLngTuple[],
   onHover: (pointIndex: number | null) => void,
 ): TrackMap {
-  const map = L.map(elementId, {
+  const map = L.map(element, {
     zoomControl: true,
     attributionControl: true,
     scrollWheelZoom: true,

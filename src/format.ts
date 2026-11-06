@@ -3,16 +3,6 @@ import type { Activity } from "./types";
 
 type Num = number | null | undefined;
 
-const HTML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-export const escapeHtml = (value: unknown) =>
-  String(value ?? "").replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
-
 export const pad2 = (n: number) => String(n).padStart(2, "0");
 
 /** 3725 -> "1:02:05", 125 -> "2:05" */

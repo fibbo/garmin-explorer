@@ -1,30 +1,27 @@
-// uPlot line charts for a recording, one per series. They share the x axis, the zoom and the cursor.
-// The recording drives zoom and cursor, so the map and the lap table stay in sync with the charts.
+// uPlot settings for the recording charts, one chart per series. They share the x axis, the zoom and the cursor.
 import uPlot from "uplot";
-import "uplot/dist/uPlot.min.css";
-import { cssVar, find } from "../dom";
+import { cssVar } from "../dom";
 import { formatDuration, pad2 } from "../format";
 import type { Samples, Series } from "../types";
-import type { Recording, XAxis } from "./recording";
+import type { XAxis } from "./recording.svelte";
 import type { ChartSeries } from "./series";
 
-export interface Chart {
+export interface ChartSetup {
   series: ChartSeries;
-  plot: uPlot;
-  /** One value per plot point (see Recording.plotSamples) */
-  values: Series;
-  /** y range for the current zoom, read by uPlot */
-  yRange: [number, number];
-  /** Shows the average, or the value under the cursor */
-  valueLabel: HTMLElement;
-  average: string;
-}
-
-export interface ChartEvents {
-  /** `source` is the chart the mouse is on, which already shows the cursor */
-  hover: (sample: number | null, source?: uPlot) => void;
-  zoom: (fromSample: number, toSample: number) => void;
-  resetZoom: () => void;
+  xAxis: XAxis;
+  /** The sample of each plot point */
+  plotSamples: number[];
+  width: number;
+  /** Only the bottom chart shows the x axis */
+  showsXAxis: boolean;
+  /** y range for the current zoom */
+  yRange: () => [number, number];
+  /** The x axis unit changed */
+  onUnit: (unit: string) => void;
+  /** The mouse moved to a sample, or left the chart */
+  onHover: (sample: number | null, source: uPlot) => void;
+  onZoom: (fromSample: number, toSample: number) => void;
+  onResetZoom: () => void;
 }
 
 const FONT = "11px system-ui, sans-serif";
@@ -57,7 +54,7 @@ export function plotAxis(samples: Samples, xAxis: XAxis) {
 }
 
 /** First plot point at or after `sample` */
-function plotIndexOf(plotSamples: number[], sample: number) {
+export function plotIndexOf(plotSamples: number[], sample: number) {
   let lo = 0,
     hi = plotSamples.length - 1;
   while (lo < hi) {
@@ -68,20 +65,11 @@ function plotIndexOf(plotSamples: number[], sample: number) {
   return lo;
 }
 
-/** Visible range of plot points for the current zoom */
-function visibleRange(rec: Recording): [number, number] {
-  const n = rec.plotX.length;
-  if (!rec.zoom) return [0, n - 1];
-  const first = plotIndexOf(rec.plotSamples, rec.zoom[0]),
-    last = Math.max(first + 1, plotIndexOf(rec.plotSamples, rec.zoom[1]));
-  return [first, Math.min(n - 1, last)];
-}
-
 /**
  * 1st to 99th percentile of the visible values plus a margin, so spikes don't flatten the line.
  * Elevation uses the full range.
  */
-function yRange(
+export function yRange(
   series: ChartSeries,
   values: Series,
   first: number,
@@ -129,16 +117,8 @@ const withAlpha = (color: string, alpha: number) =>
         .padStart(2, "0")
     : color;
 
-function chartOptions(
-  rec: Recording,
-  chart: Chart,
-  width: number,
-  showsXAxis: boolean,
-  unitLabel: HTMLElement,
-  events: ChartEvents,
-): uPlot.Options {
-  const { series } = chart;
-  const xAxis = rec.xAxis;
+export function chartOptions(setup: ChartSetup): uPlot.Options {
+  const { series, xAxis, plotSamples, width, showsXAxis } = setup;
   const muted = () => cssVar("--muted"),
     border = () => cssVar("--border"),
     color = () => cssVar(series.colorVar);
@@ -152,7 +132,7 @@ function chartOptions(
         time: false,
         range: (_u, min, max) => (min === max ? [min, min + 1] : [min, max]),
       },
-      y: { dir: series.invert ? -1 : 1, range: () => chart.yRange },
+      y: { dir: series.invert ? -1 : 1, range: () => setup.yRange() },
     },
     axes: [
       {
@@ -213,7 +193,7 @@ function chartOptions(
       drag: { x: true, y: false, setScale: false },
       bind: {
         dblclick: () => () => {
-          events.resetZoom();
+          setup.onResetZoom();
           return null;
         },
       },
@@ -222,7 +202,7 @@ function chartOptions(
       setCursor: [
         (u) => {
           const p = u.cursor.idx;
-          events.hover(p == null ? null : rec.plotSamples[p], u);
+          setup.onHover(p == null ? null : plotSamples[p], u);
         },
       ],
       setSelect: [
@@ -231,8 +211,7 @@ function chartOptions(
           if (width > MIN_ZOOM_DRAG) {
             const from = u.posToIdx(left),
               to = u.posToIdx(left + width);
-            if (to > from)
-              events.zoom(rec.plotSamples[from], rec.plotSamples[to]);
+            if (to > from) setup.onZoom(plotSamples[from], plotSamples[to]);
           }
           u.setSelect({ left: 0, top: 0, width: 0, height: 0 }, false);
         },
@@ -240,132 +219,15 @@ function chartOptions(
       draw: [
         (u) => {
           if (showsXAxis)
-            unitLabel.textContent =
+            setup.onUnit(
               xAxis === "distance"
                 ? "km"
                 : (u.scales.x.max ?? 0) >= 3600
                   ? "h:mm"
-                  : "min";
+                  : "min",
+            );
         },
       ],
     },
   };
-}
-
-function createChart(
-  rec: Recording,
-  series: ChartSeries,
-  showsXAxis: boolean,
-  container: HTMLElement,
-  events: ChartEvents,
-): Chart {
-  const [first, last] = visibleRange(rec);
-  const values = rec.plotSamples.map((i) => series.values[i]);
-  const defined = values.filter((v) => v != null);
-  const average = `avg ${series.format(defined.reduce((s, v) => s + v, 0) / (defined.length || 1))} ${series.unit}`;
-  const root = document.createElement("div");
-  root.className = "chart";
-  root.innerHTML = `<div class="chart-h"><span class="name"><i class="dot" style="background:var(${series.colorVar})"></i>${series.name}</span>
-      <span class="val num">${average}</span></div>
-      <div class="chart-w"><span class="x-unit"></span></div>`;
-  container.appendChild(root);
-  const plotArea = find(".chart-w", root);
-
-  const chart = {
-    series,
-    values,
-    yRange: yRange(series, values, first, last),
-    valueLabel: find(".val", root),
-    average,
-  } as Chart;
-  const plot = new uPlot(
-    chartOptions(
-      rec,
-      chart,
-      plotArea.clientWidth,
-      showsXAxis,
-      find(".x-unit", root),
-      events,
-    ),
-    [rec.plotX, values],
-    plotArea,
-  );
-  chart.plot = plot;
-  if (rec.zoom)
-    plot.setScale("x", { min: rec.plotX[first], max: rec.plotX[last] });
-
-  // uPlot has no touch support, so move the cursor on touch ourselves.
-  plot.over.addEventListener(
-    "touchmove",
-    (e) => {
-      const left =
-        e.touches[0].clientX - plot.over.getBoundingClientRect().left;
-      events.hover(rec.plotSamples[plot.posToIdx(left)] ?? null);
-    },
-    { passive: true },
-  );
-  plot.over.addEventListener("touchend", () => events.hover(null));
-  return chart;
-}
-
-export function createCharts(
-  rec: Recording,
-  container: HTMLElement,
-  events: ChartEvents,
-): Chart[] {
-  container.innerHTML = "";
-  return rec.series.map((series, k) =>
-    createChart(rec, series, k === rec.series.length - 1, container, events),
-  );
-}
-
-export function destroyCharts(charts: Chart[]) {
-  charts.forEach((c) => c.plot.destroy());
-}
-
-export function resizeCharts(charts: Chart[], width: number) {
-  charts.forEach((c) => {
-    if (c.plot.width !== width)
-      c.plot.setSize({ width, height: c.plot.height });
-  });
-}
-
-/** Repaints with the current theme colors */
-export function redrawCharts(charts: Chart[]) {
-  charts.forEach((c) => c.plot.redraw(false));
-}
-
-/** Shows rec.zoom on all charts, with each chart's y range fitted to the visible part. */
-export function applyZoom(rec: Recording) {
-  if (!rec.plotX.length) return;
-  const [first, last] = visibleRange(rec);
-  for (const chart of rec.charts) {
-    chart.yRange = yRange(chart.series, chart.values, first, last);
-    chart.plot.setScale("x", { min: rec.plotX[first], max: rec.plotX[last] });
-  }
-}
-
-/** Moves the cursor of every chart except `source` to rec.cursor, and updates the value labels. */
-export function showCursor(rec: Recording, source?: uPlot) {
-  const p =
-    rec.cursor == null || !rec.plotSamples.length
-      ? null
-      : plotIndexOf(rec.plotSamples, rec.cursor);
-  for (const chart of rec.charts) {
-    if (chart.plot !== source)
-      chart.plot.setCursor(
-        {
-          left: p == null ? -10 : chart.plot.valToPos(rec.plotX[p], "x"),
-          top: 0,
-        },
-        false,
-      );
-    const v = p == null ? null : chart.values[p];
-    chart.valueLabel.textContent =
-      p == null
-        ? chart.average
-        : v == null
-          ? "–"
-          : `${chart.series.format(v)} ${chart.series.unit}`;
-  }
 }

@@ -42,41 +42,46 @@ It replaces `data/index.json`, so sync again afterwards to add activities that a
 
 ## Development
 
-The app is written in TypeScript in `src/`, the server and the scripts in `server/`.
+The app is written in [Svelte](https://svelte.dev) 5 and TypeScript in `src/`, the server and the scripts in TypeScript in `server/`.
 Node runs `server/` directly, without a build step.
-`npm run build` type-checks both with `tsc` and bundles the app with esbuild into `dist/app.js` and `dist/app.css`, which `index.html` loads.
+`npm run build` type-checks both and builds the app with [Vite](https://vite.dev) into `dist/`, which the server serves.
 
 ```sh
 npm install
-npm run build   # type-check and bundle
+npm run build   # type-check and build
 npm run watch   # rebuild the app on every change (no type-check, use `npm run check` for that)
 npm run serve   # serve on http://localhost:8000, `-- --port 8001 --open` to change the port and open the browser
+npm run format  # format with Prettier
 ```
 
 `serve.command` also installs the packages and rebuilds before it serves the page.
 
 ## Layout
 
-- `index.html` - page markup and styles
-- `src/` - the app, bundled into `dist/app.js`
-  - `main.ts` - entry point and routing
+- `index.html` - the page Vite builds the app into
+- `src/` - the app
+  - `main.ts` - entry point
+  - `App.svelte` - loads the activities, routes between the pages and handles the keyboard shortcuts
+  - `app.css` - theme colors and the styles shared by several components.
+    Each component has its own styles.
+  - `state.svelte.ts` - the activities, the filters, the open activity and the overview settings
   - `data-format.ts` - the format of `data/index.json` and of the sync progress, shared with `server/`
   - `types.ts` - the activity and track types the app works with
   - `data.ts` - reads `data/` and maps its short keys to the readable names in `types.ts`
-  - `fit.ts` - decodes a `.fit` file into a track with Garmin's FIT SDK
-  - `state.ts` - the current filters, sort, selection and tab, and the links between pages
-  - `storage.ts` - remembers settings in `localStorage`
-  - `sync.ts` - the Sync button and its progress panel
-  - `theme.ts` - the light, dark and auto theme switch
-  - `sports.ts` - sport groups, icons and per-sport rules (pace or speed, cadence per leg)
+  - `fit.ts` - decodes a `.fit` file into a track with Garmin's FIT SDK.
+    It loads with the first recording, as the SDK is large.
+  - `Header.svelte`, `SyncPanel.svelte`, `sync.svelte.ts` - the top bar, and the Sync button with its progress panel
+  - `theme.svelte.ts` - the light, dark and auto theme switch
+  - `ActivitiesView.svelte`, `Sidebar.svelte` - the activities page: filters and list on the left, the open activity on the right
+  - `sports.ts`, `SportBadge.svelte` - sport groups, icons and per-sport rules (pace or speed, cadence per leg)
   - `format.ts` - number, duration, distance, pace and date formatting
-  - `dom.ts` - small DOM helpers
-  - `css.d.ts` - lets TypeScript import `.css` files, which esbuild bundles into `dist/app.css`
-  - `list.ts` - sidebar filters and activity list
-  - `detail/` - activity page: summary, laps, HR zones, and the recording (map and charts kept in sync)
+  - `storage.ts` - remembers settings in `localStorage`
+  - `dom.ts` - reads the theme colors for the charts and the map
+  - `detail/` - activity page: summary, laps, HR zones, and the recording.
+    `recording.svelte.ts` keeps the map (`TrackMap.svelte`) and the charts (`Chart.svelte`) in sync.
   - `overview/` - overview page: totals, bar chart, records
 - `server/`
-  - `serve.ts` - serves the page on 127.0.0.1 and runs the sync when the page asks
+  - `serve.ts` - serves `dist/` and `data/` on 127.0.0.1 and runs the sync when the page asks
   - `sync.ts` - Garmin Connect Personal API → `data/`
   - `import.ts` - Garmin data export → `data/`
   - `garmin-api.ts` - Personal API client
@@ -85,8 +90,7 @@ npm run serve   # serve on http://localhost:8000, `-- --port 8001 --open` to cha
 - `data/index.json` - all activity summaries, with a format version
 - `data/fit/<activityId>.fit` - the original recording of each activity, decoded in the browser at full resolution when the activity is opened.
   The activities of a multisport race (e.g. a triathlon) share one file, and each shows its own session of it.
-- `lib/` - Leaflet 1.9.4 (BSD-2-Clause)
-- Charts use [uPlot](https://github.com/leeoniya/uPlot) (MIT), zips are read with [fflate](https://github.com/101arrowz/fflate) (MIT)
+- The map uses [Leaflet](https://leafletjs.com) (BSD-2-Clause), the charts [uPlot](https://github.com/leeoniya/uPlot) (MIT), and zips are read with [fflate](https://github.com/101arrowz/fflate) (MIT)
 - `.fit` files are decoded with Garmin's [FIT JavaScript SDK](https://www.npmjs.com/package/@garmin/fitsdk) (`@garmin/fitsdk`), under Garmin's FIT Protocol License, not an open-source license
 
 ## Tips

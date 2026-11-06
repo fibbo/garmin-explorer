@@ -1,15 +1,12 @@
 import {
-  escapeHtml,
-  formatDate,
   formatDistance,
   formatDuration,
   formatNumber,
   formatPace,
 } from "../format";
-import { sportBadge } from "../sports";
 import type { Activity } from "../types";
 
-interface RecordEntry {
+export interface RecordEntry {
   label: string;
   activity: Activity | null;
   value: (a: Activity) => string;
@@ -35,7 +32,7 @@ function highest(
   return best;
 }
 
-function records(activities: Activity[]): RecordEntry[] {
+export function records(activities: Activity[]): RecordEntry[] {
   const distance = (a: Activity) => formatDistance(a.distance, a);
   return [
     {
@@ -91,15 +88,4 @@ function records(activities: Activity[]): RecordEntry[] {
       value: (a) => Math.round(a.avgHr || 0) + " bpm",
     },
   ];
-}
-
-/** The record tiles. Each has data-id set to its activity. */
-export function recordsHtml(activities: Activity[]) {
-  return records(activities)
-    .map(({ label, activity: a, value }) =>
-      a
-        ? `<div class="rec" data-id="${a.id}">${sportBadge(a)}<div style="min-width:0"><div class="l">${label}</div><div class="v num">${value(a)}</div><div class="s">${escapeHtml(a.name)} · ${formatDate(a.localStart)}</div></div></div>`
-        : "",
-    )
-    .join("");
 }

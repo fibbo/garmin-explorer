@@ -17,8 +17,8 @@ import { parseArgs } from "node:util";
 import type { SyncEvent } from "../src/data-format.ts";
 
 const ROOT = join(import.meta.dirname, "..");
-/** What the page loads. Everything else in the folder stays private. */
-const PUBLIC = ["index.html", `dist${sep}`, `lib${sep}`, `data${sep}`];
+/** The page, built into dist/ by `npm run build` */
+const DIST = join(ROOT, "dist");
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -103,15 +103,15 @@ function streamSync(res: ServerResponse) {
 function serveFile(req: IncomingMessage, res: ServerResponse, path: string) {
   let relative: string;
   try {
-    relative = normalize(
-      decodeURIComponent(path === "/" ? "/index.html" : path),
-    ).slice(1);
+    // The leading "/" keeps ".." from leaving the folder
+    relative = normalize(decodeURIComponent(path)).slice(1);
   } catch {
     return send(res, 400, "Bad request");
   }
-  if (!PUBLIC.some((p) => relative === p || relative.startsWith(p)))
-    return send(res, 404, "Not found");
-  const file = join(ROOT, relative);
+  // Only the page and data/ are served. Everything else in the folder stays private.
+  const file = relative.startsWith(`data${sep}`)
+    ? join(ROOT, relative)
+    : join(DIST, relative || "index.html");
   let stats: Stats;
   try {
     stats = statSync(file);

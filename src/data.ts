@@ -1,7 +1,6 @@
 // Reads data/: index.json with the activity summaries, and the original .fit file of each activity.
 // The summaries use short keys to stay small. This module maps them to readable names.
 import { DATA_VERSION, type Index, type Summary } from "./data-format";
-import { trackFromFit } from "./fit";
 import { activityTypeLabel, sportOf } from "./sports";
 import type { Activity, Track } from "./types";
 
@@ -48,25 +47,18 @@ function toActivity(raw: Summary): Activity {
 
 /** A problem with data/ that the user has to fix. The message (HTML) says how. */
 export class DataError extends Error {
-  constructor(
-    readonly title: string,
-    message: string,
-  ) {
+  readonly title: string;
+  constructor(title: string, message: string) {
     super(message);
+    this.title = title;
   }
 }
 
 export const NO_DATA_HELP =
   "Click <b>Sync</b> to download your activities from Garmin Connect, or import a Garmin data export with <code>npm run import -- /path/to/export</code>.";
 
-/** All activities, newest first. Filled by loadActivities(). */
-export const activities: Activity[] = [];
-export const activityById = new Map<number, Activity>();
-/** Years with activities, newest first */
-export const activityYears: number[] = [];
-
-/** Loads data/index.json, replacing the activities loaded before. */
-export async function loadActivities() {
+/** Loads data/index.json. The activities are newest first. */
+export async function loadActivities(): Promise<Activity[]> {
   if (location.protocol === "file:")
     throw new DataError(
       "Start the server",
@@ -85,14 +77,7 @@ export async function loadActivities() {
       "Data needs updating",
       "data/ was written by another version of Garmin Explorer. Import your export again with <code>npm run import -- /path/to/export</code>, or move data/ away and sync again.",
     );
-  activities.length = 0;
-  activityById.clear();
-  activityYears.length = 0;
-  activities.push(...index.activities.map(toActivity));
-  activities.forEach((a) => activityById.set(a.id, a));
-  activityYears.push(
-    ...[...new Set(activities.map((a) => a.year))].sort((a, b) => b - a),
-  );
+  return index.activities.map(toActivity);
 }
 
 const tracks = new Map<number, Promise<Track | null>>();
@@ -100,7 +85,12 @@ const tracks = new Map<number, Promise<Track | null>>();
 async function fetchTrack(a: Activity) {
   const response = await fetch(`data/fit/${a.id}.fit`);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return trackFromFit(await response.arrayBuffer(), a);
+  // The FIT SDK is large, so it loads with the first recording
+  const [{ trackFromFit }, buffer] = await Promise.all([
+    import("./fit"),
+    response.arrayBuffer(),
+  ]);
+  return trackFromFit(buffer, a);
 }
 
 /** Decodes data/fit/<id>.fit. Resolves to null when it can't be loaded or decoded. */

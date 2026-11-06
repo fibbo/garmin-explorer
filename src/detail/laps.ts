@@ -7,14 +7,14 @@ import {
 import { usesPace } from "../sports";
 import type { Activity, Lap, Track } from "../types";
 
-interface Column {
+export interface Column {
   header: string;
   cell: (lap: Lap, index: number) => string | number;
   /** Hide the column when no lap has a value for this field */
   field?: keyof Lap;
 }
 
-function columns(a: Activity): Column[] {
+function allColumns(a: Activity): Column[] {
   const pace = usesPace(a);
   return [
     { header: "Lap", cell: (_, i) => i + 1 },
@@ -58,16 +58,11 @@ function columns(a: Activity): Column[] {
   ];
 }
 
-/** The laps card, or "" when there is only one lap */
-export function lapsCard(a: Activity, laps: Lap[]) {
-  if (laps.length < 2) return "";
-  const shown = columns(a).filter(({ field }) =>
+/** The columns that have a value in at least one lap */
+export const columns = (a: Activity, laps: Lap[]) =>
+  allColumns(a).filter(({ field }) =>
     field ? laps.some((l) => l[field] != null && l[field] !== 0) : true,
   );
-  return `<div class="card"><div class="card-h"><h2>Laps</h2><span class="hint">Click a lap to zoom to it</span></div>
-      <div class="card-b table-wrap"><table><thead><tr>${shown.map((c) => `<th>${c.header}</th>`).join("")}</tr></thead>
-      <tbody>${laps.map((l, i) => `<tr class="click" data-lap="${i}">${shown.map((c) => `<td>${c.cell(l, i)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
-}
 
 /** First and last sample of a lap, or null when the lap has no samples */
 export function lapSamples(
