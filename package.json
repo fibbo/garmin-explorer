@@ -1,0 +1,28 @@
+{
+  "name": "garmin-explorer",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "npm run check && npm run bundle",
+    "bundle": "esbuild src/main.ts --bundle --format=iife --target=es2022 --minify --sourcemap --outfile=dist/app.js",
+    "watch": "npm run bundle -- --watch",
+    "check": "tsc && tsc -p server",
+    "serve": "node server/serve.ts",
+    "sync": "node server/sync.ts",
+    "import": "node server/import.ts"
+  },
+  "dependencies": {
+    "@garmin/fitsdk": "^21.221.0",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@types/leaflet": "~1.9.0",
+    "@types/node": "~24.19.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "uplot": "^1.6.32"
+  }
+}
