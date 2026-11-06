@@ -4,7 +4,7 @@
 # Close this window (or Ctrl+C) to stop.
 cd "$(dirname "$0")"
 PORT="${1:-8000}"
-if ! node -e 'process.exit(+process.versions.node.split(".")[0] < 24)' 2>/dev/null; then
+if ! node -e 'process.exit(+process.versions.node.split(".")[0] < 24 ? 1 : 0)' 2>/dev/null; then
   echo "Garmin Explorer needs Node.js 24 or newer: https://nodejs.org"
   exit 1
 fi
